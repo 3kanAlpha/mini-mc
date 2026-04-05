@@ -101,7 +101,7 @@ body {
 #health {
 	position: absolute;
 	left: 50%;
-	bottom: 94px;
+	bottom: 120px;
 	transform: translateX(-50%);
 	padding: 7px 12px;
 	border: 1px solid rgba(255, 255, 255, 0.2);
