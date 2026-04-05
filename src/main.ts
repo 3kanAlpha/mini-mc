@@ -1,5 +1,6 @@
 import "./style.css";
 import {
+	BackSide,
 	BoxGeometry,
 	Clock,
 	Color,
@@ -10,12 +11,16 @@ import {
 	HemisphereLight,
 	LineBasicMaterial,
 	LineSegments,
+	Mesh,
 	PerspectiveCamera,
 	Scene,
+	ShaderMaterial,
+	SphereGeometry,
 	Vector3,
 	WebGLRenderer,
 } from "three";
 import { BLOCK_DEFS, BlockMaterials } from "./game/blocks";
+import { CloudLayer } from "./game/clouds";
 import { Hud } from "./game/hud";
 import { ChunkRenderer } from "./game/mesher";
 import { Player } from "./game/player";
@@ -30,6 +35,9 @@ import { isBlockBreakable, VoxelWorld } from "./game/world";
 
 const MAX_HEALTH = 20;
 const HIGHLIGHT_DISTANCE = 5;
+const WORLD_SEED = Date.now();
+const BASE_FOV = 75;
+const DASH_FOV = 85;
 
 const hotbarSlots: BlockId[] = [
 	BlockId.Grass,
@@ -51,13 +59,44 @@ if (!app) {
 const hud = new Hud(app);
 const canvas = hud.canvas;
 const scene = new Scene();
-const skyColor = new Color(0x87ceeb);
-scene.background = skyColor;
+const skyColor = new Color(0xa9d3ff);
 scene.fog = new Fog(
 	skyColor,
 	CHUNK_SIZE * (RENDER_DISTANCE - 1.2),
 	CHUNK_SIZE * (RENDER_DISTANCE + 1.8),
 );
+
+const skyDome = new Mesh(
+	new SphereGeometry(480, 32, 16),
+	new ShaderMaterial({
+		side: BackSide,
+		depthWrite: false,
+		uniforms: {
+			horizonColor: { value: new Color(0xa9d3ff) },
+			zenithColor: { value: new Color(0x4a86d9) },
+		},
+		vertexShader: `
+			varying vec3 vDir;
+			void main() {
+				vec4 worldPos = modelMatrix * vec4(position, 1.0);
+				vDir = normalize(worldPos.xyz - cameraPosition);
+				gl_Position = projectionMatrix * viewMatrix * worldPos;
+			}
+		`,
+		fragmentShader: `
+			uniform vec3 horizonColor;
+			uniform vec3 zenithColor;
+			varying vec3 vDir;
+			void main() {
+				float h = clamp(vDir.y * 0.5 + 0.5, 0.0, 1.0);
+				float t = smoothstep(0.45, 1.0, h);
+				vec3 color = mix(horizonColor, zenithColor, t);
+				gl_FragColor = vec4(color, 1.0);
+			}
+		`,
+	}),
+);
+scene.add(skyDome);
 
 const camera = new PerspectiveCamera(
 	75,
@@ -75,14 +114,16 @@ renderer.setSize(window.innerWidth, window.innerHeight);
 const hemi = new HemisphereLight(0xcde8ff, 0x5c7a4e, 1.0);
 scene.add(hemi);
 
-const sun = new DirectionalLight(0xffffff, 1.1);
-sun.position.set(80, 120, 60);
+const sun = new DirectionalLight(0xffffff, 1.2);
+sun.position.set(80, 180, 60);
 scene.add(sun);
 
-const world = new VoxelWorld(Date.now());
+const world = new VoxelWorld(WORLD_SEED);
 const materials = new BlockMaterials();
 const chunkRenderer = new ChunkRenderer(world, scene, materials);
 const player = new Player(world);
+const clouds = new CloudLayer(WORLD_SEED);
+scene.add(clouds.root);
 
 const highlight = new LineSegments(
 	new EdgesGeometry(new BoxGeometry(1.002, 1.002, 1.002)),
@@ -104,8 +145,8 @@ const keyState = {
 	left: false,
 	right: false,
 	jump: false,
-	sprint: false,
 };
+let sprintLatched = false;
 
 function ensureAudioContext() {
 	if (!audioContext) {
@@ -165,11 +206,17 @@ function handleDeath() {
 function updateMovementInput() {
 	const strafe = (keyState.left ? -1 : 0) + (keyState.right ? 1 : 0);
 	const forward = (keyState.forward ? 1 : 0) + (keyState.backward ? -1 : 0);
+	const isMoving = strafe !== 0 || forward !== 0;
+	if (!isMoving) {
+		sprintLatched = false;
+	}
+	const sprinting = sprintLatched && isMoving;
 	player.setMoveInput(strafe, forward);
-	player.setSprinting(keyState.sprint);
+	player.setSprinting(sprinting);
 	if (keyState.jump) {
 		player.jump();
 	}
+	return sprinting;
 }
 
 function blockLabel(block: BlockId) {
@@ -268,7 +315,9 @@ document.addEventListener("keydown", (event) => {
 			break;
 		case "ControlLeft":
 		case "ControlRight":
-			keyState.sprint = true;
+			if (!sprintLatched) {
+				sprintLatched = true;
+			}
 			break;
 		default:
 			break;
@@ -296,10 +345,6 @@ document.addEventListener("keyup", (event) => {
 			break;
 		case "Space":
 			keyState.jump = false;
-			break;
-		case "ControlLeft":
-		case "ControlRight":
-			keyState.sprint = false;
 			break;
 		default:
 			break;
@@ -360,9 +405,13 @@ const euler = new Euler();
 function animate() {
 	requestAnimationFrame(animate);
 	const dt = Math.min(clock.getDelta(), 0.05);
+	const elapsed = clock.elapsedTime;
 
 	if (!isDead) {
-		updateMovementInput();
+		const sprinting = updateMovementInput();
+		const targetFov = sprinting ? DASH_FOV : BASE_FOV;
+		camera.fov += (targetFov - camera.fov) * Math.min(1, dt * 8);
+		camera.updateProjectionMatrix();
 		const landedDistance = player.update(dt);
 		if (landedDistance > 3) {
 			const damage = Math.floor(landedDistance - 3); // 修正しなくてよい
@@ -370,10 +419,14 @@ function animate() {
 				takeDamage(damage);
 			}
 		}
+	} else {
+		camera.fov += (BASE_FOV - camera.fov) * Math.min(1, dt * 8);
+		camera.updateProjectionMatrix();
 	}
 	hud.renderPosition(player.position.x, player.position.y, player.position.z);
 
 	world.tickSand();
+	clouds.update(elapsed);
 	chunkRenderer.updateAround(
 		player.position.x,
 		player.position.z,
@@ -390,6 +443,7 @@ function animate() {
 	}
 	camera.quaternion.setFromEuler(euler);
 	const rawEye = player.getEyePosition();
+	skyDome.position.copy(rawEye);
 	const eye = rawEye.clone();
 	if (shakeTimer > 0) {
 		const decay = shakeTimer / 0.28;
