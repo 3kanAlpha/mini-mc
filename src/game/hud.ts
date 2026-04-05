@@ -1,0 +1,86 @@
+import { BlockId } from "./types";
+
+const BLOCK_LABEL: Record<BlockId, string> = {
+	[BlockId.Air]: "Air",
+	[BlockId.Grass]: "Grass",
+	[BlockId.Dirt]: "Dirt",
+	[BlockId.Stone]: "Stone",
+	[BlockId.Sand]: "Sand",
+	[BlockId.Log]: "Log",
+	[BlockId.Leaves]: "Leaves",
+	[BlockId.Water]: "Water",
+};
+
+export class Hud {
+	private readonly healthEl: HTMLDivElement;
+	private readonly positionEl: HTMLDivElement;
+	private readonly underwaterOverlayEl: HTMLDivElement;
+	private readonly hotbarEl: HTMLDivElement;
+	private readonly deathEl: HTMLDivElement;
+	private readonly deathMessageEl: HTMLDivElement;
+	private readonly respawnButton: HTMLButtonElement;
+
+	constructor(root: HTMLElement) {
+		root.innerHTML = `
+			<div id="game-wrap">
+				<canvas id="game-canvas"></canvas>
+				<div id="hud-layer">
+					<div id="underwater-overlay"></div>
+					<div id="crosshair" aria-hidden="true"></div>
+					<div id="position"></div>
+					<div id="health"></div>
+					<div id="hotbar"></div>
+					<div id="hint">クリックで視点固定 / WASD + Space で移動</div>
+					<div id="death-screen" class="hidden">
+						<div id="death-message"></div>
+						<button id="respawn">リスポーン</button>
+					</div>
+				</div>
+			</div>
+		`;
+		this.underwaterOverlayEl = root.querySelector<HTMLDivElement>(
+			"#underwater-overlay",
+		)!;
+		this.positionEl = root.querySelector<HTMLDivElement>("#position")!;
+		this.healthEl = root.querySelector<HTMLDivElement>("#health")!;
+		this.hotbarEl = root.querySelector<HTMLDivElement>("#hotbar")!;
+		this.deathEl = root.querySelector<HTMLDivElement>("#death-screen")!;
+		this.deathMessageEl = root.querySelector<HTMLDivElement>("#death-message")!;
+		this.respawnButton = root.querySelector<HTMLButtonElement>("#respawn")!;
+	}
+
+	get canvas() {
+		return document.querySelector<HTMLCanvasElement>("#game-canvas")!;
+	}
+
+	renderHealth(health: number, maxHealth: number) {
+		this.healthEl.textContent = `Health: ${health}/${maxHealth}`;
+	}
+
+	renderPosition(x: number, y: number, z: number) {
+		this.positionEl.textContent = `XYZ: ${x.toFixed(1)}, ${y.toFixed(1)}, ${z.toFixed(1)}`;
+	}
+
+	setUnderwaterOverlay(visible: boolean) {
+		this.underwaterOverlayEl.classList.toggle("visible", visible);
+	}
+
+	renderHotbar(blocks: BlockId[], selectedIndex: number) {
+		this.hotbarEl.innerHTML = blocks
+			.map((id, index) => {
+				const selected = index === selectedIndex ? "selected" : "";
+				return `<div class="slot ${selected}"><span class="num">${index + 1}</span><span class="name">${BLOCK_LABEL[id]}</span></div>`;
+			})
+			.join("");
+	}
+
+	showDeath(onRespawn: () => void) {
+		this.deathMessageEl.textContent = "あなたは死亡しました";
+		this.deathEl.classList.remove("hidden");
+		this.respawnButton.onclick = onRespawn;
+	}
+
+	hideDeath() {
+		this.deathEl.classList.add("hidden");
+	}
+}
