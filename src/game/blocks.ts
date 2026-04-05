@@ -185,7 +185,7 @@ export class BlockMaterials {
 			new MeshLambertMaterial({
 				color: 0x3b82f6,
 				transparent: true,
-				opacity: 0.45,
+				opacity: 0.7,
 			}),
 		);
 	}
