@@ -60,6 +60,8 @@ const FACE_VERTICES: Record<Face, readonly [number, number, number][]> = {
 	],
 };
 
+const TOP_WATER_HEIGHT = 15 / 16;
+
 function pushFaceUvs(uvs: number[], block: BlockId, face: Face) {
 	const base = [
 		[0, 0],
@@ -128,6 +130,10 @@ export function buildChunkMesh(
 				if (block === BlockId.Air) {
 					continue;
 				}
+				const isTopWaterSurface =
+					block === BlockId.Water &&
+					world.getBlock(wx, y + 1, wz) !== BlockId.Water;
+				const topHeight = isTopWaterSurface ? TOP_WATER_HEIGHT : 1;
 
 				for (let face = 0 as Face; face <= 5; face = (face + 1) as Face) {
 					const [ox, oy, oz] = FACE_OFFSETS[face];
@@ -141,7 +147,8 @@ export function buildChunkMesh(
 					const [nx, ny, nz] = FACE_NORMALS[face];
 					for (let i = 0; i < 4; i++) {
 						const [vx, vy, vz] = verts[i];
-						positions.push(wx + vx, y + vy, wz + vz);
+						const vertexY = vy === 1 ? topHeight : 0;
+						positions.push(wx + vx, y + vertexY, wz + vz);
 						normals.push(nx, ny, nz);
 					}
 					pushFaceUvs(uvs, block, face);

@@ -6,6 +6,7 @@ import {
 	DirectionalLight,
 	EdgesGeometry,
 	Euler,
+	Fog,
 	HemisphereLight,
 	LineBasicMaterial,
 	LineSegments,
@@ -19,7 +20,12 @@ import { Hud } from "./game/hud";
 import { ChunkRenderer } from "./game/mesher";
 import { Player } from "./game/player";
 import { voxelRaycast } from "./game/raycast";
-import { BlockId, INTERACTION_DISTANCE, RENDER_DISTANCE } from "./game/types";
+import {
+	BlockId,
+	CHUNK_SIZE,
+	INTERACTION_DISTANCE,
+	RENDER_DISTANCE,
+} from "./game/types";
 import { isBlockBreakable, VoxelWorld } from "./game/world";
 
 const MAX_HEALTH = 20;
@@ -45,7 +51,13 @@ if (!app) {
 const hud = new Hud(app);
 const canvas = hud.canvas;
 const scene = new Scene();
-scene.background = new Color(0x87ceeb);
+const skyColor = new Color(0x87ceeb);
+scene.background = skyColor;
+scene.fog = new Fog(
+	skyColor,
+	CHUNK_SIZE * (RENDER_DISTANCE - 1.2),
+	CHUNK_SIZE * (RENDER_DISTANCE + 1.8),
+);
 
 const camera = new PerspectiveCamera(
 	75,
