@@ -1,4 +1,5 @@
 import type { Vector3 } from "three";
+import { BLOCK_DEFS } from "./blocks";
 import type { VoxelHit } from "./types";
 import type { VoxelWorld } from "./world";
 
@@ -46,7 +47,7 @@ export function voxelRaycast(
 
 	while (traveled <= maxDistance) {
 		const block = world.getBlock(x, y, z);
-		if (block !== 0) {
+		if (block !== 0 && !BLOCK_DEFS[block].liquid) {
 			return {
 				block: { x, y, z },
 				previous,
