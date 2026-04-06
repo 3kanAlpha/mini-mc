@@ -10,6 +10,7 @@ const BLOCK_LABEL: Record<BlockId, string> = {
 	[BlockId.Leaves]: "Leaves",
 	[BlockId.Water]: "Water",
 	[BlockId.Planks]: "Planks",
+	[BlockId.Bedrock]: "Bedrock",
 };
 
 export class Hud {

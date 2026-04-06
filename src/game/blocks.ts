@@ -13,6 +13,7 @@ export interface BlockDef {
 	name: string;
 	solid: boolean;
 	breakable: boolean;
+	breakSeconds: number;
 	transparent: boolean;
 	liquid: boolean;
 	slows: boolean;
@@ -37,6 +38,7 @@ const textureByKey = {
 	logTop: loadBlockTexture("/textures/block/log_oak_top.png"),
 	planks: loadBlockTexture("/textures/block/planks_oak.png"),
 	leaves: loadBlockTexture("/textures/block/leaves_oak.png"),
+	bedrock: loadBlockTexture("/textures/block/bedrock.png"),
 } as const;
 
 export const BLOCK_DEFS: Record<BlockId, BlockDef> = {
@@ -45,6 +47,7 @@ export const BLOCK_DEFS: Record<BlockId, BlockDef> = {
 		name: "Air",
 		solid: false,
 		breakable: false,
+		breakSeconds: 0,
 		transparent: true,
 		liquid: false,
 		slows: false,
@@ -54,6 +57,7 @@ export const BLOCK_DEFS: Record<BlockId, BlockDef> = {
 		name: "Grass",
 		solid: true,
 		breakable: true,
+		breakSeconds: 0.45,
 		transparent: false,
 		liquid: false,
 		slows: false,
@@ -63,6 +67,7 @@ export const BLOCK_DEFS: Record<BlockId, BlockDef> = {
 		name: "Dirt",
 		solid: true,
 		breakable: true,
+		breakSeconds: 0.35,
 		transparent: false,
 		liquid: false,
 		slows: false,
@@ -72,6 +77,7 @@ export const BLOCK_DEFS: Record<BlockId, BlockDef> = {
 		name: "Stone",
 		solid: true,
 		breakable: true,
+		breakSeconds: 1.35,
 		transparent: false,
 		liquid: false,
 		slows: false,
@@ -81,6 +87,7 @@ export const BLOCK_DEFS: Record<BlockId, BlockDef> = {
 		name: "Sand",
 		solid: true,
 		breakable: true,
+		breakSeconds: 0.3,
 		transparent: false,
 		liquid: false,
 		slows: false,
@@ -90,6 +97,7 @@ export const BLOCK_DEFS: Record<BlockId, BlockDef> = {
 		name: "Log",
 		solid: true,
 		breakable: true,
+		breakSeconds: 0.95,
 		transparent: false,
 		liquid: false,
 		slows: false,
@@ -99,6 +107,7 @@ export const BLOCK_DEFS: Record<BlockId, BlockDef> = {
 		name: "Leaves",
 		solid: true,
 		breakable: true,
+		breakSeconds: 0.22,
 		transparent: true,
 		liquid: false,
 		slows: false,
@@ -108,6 +117,7 @@ export const BLOCK_DEFS: Record<BlockId, BlockDef> = {
 		name: "Water",
 		solid: false,
 		breakable: false,
+		breakSeconds: 0,
 		transparent: true,
 		liquid: true,
 		slows: true,
@@ -117,6 +127,17 @@ export const BLOCK_DEFS: Record<BlockId, BlockDef> = {
 		name: "Planks",
 		solid: true,
 		breakable: true,
+		breakSeconds: 0.75,
+		transparent: false,
+		liquid: false,
+		slows: false,
+	},
+	[BlockId.Bedrock]: {
+		id: BlockId.Bedrock,
+		name: "Bedrock",
+		solid: true,
+		breakable: false,
+		breakSeconds: 0,
 		transparent: false,
 		liquid: false,
 		slows: false,
@@ -144,6 +165,8 @@ function textureKeyForFace(block: BlockId, face: Face) {
 			return "leaves";
 		case BlockId.Planks:
 			return "planks";
+		case BlockId.Bedrock:
+			return "bedrock";
 		default:
 			return undefined;
 	}
@@ -172,6 +195,7 @@ export class BlockMaterials {
 			BlockId.Sand,
 			BlockId.Log,
 			BlockId.Planks,
+			BlockId.Bedrock,
 			BlockId.Leaves,
 		]) {
 			for (const face of FACE_ORDER) {

@@ -323,7 +323,7 @@ export class VoxelWorld {
 				}
 				const surface = this.heightAt(wx, wz);
 				for (let y = 0; y <= surface; y++) {
-					let block: BlockId = BlockId.Stone;
+					let block: BlockId = y === 0 ? BlockId.Bedrock : BlockId.Stone;
 					if (y >= surface - 2 && y < surface) {
 						block = BlockId.Dirt;
 					}
@@ -335,9 +335,18 @@ export class VoxelWorld {
 			}
 		}
 
+		this.fillSeaWater(chunk);
 		this.decoratePonds(chunk);
 		this.decorateTrees(chunk);
-		this.fillSeaWater(chunk);
+		this.enforceBedrockFloor(chunk);
+	}
+
+	private enforceBedrockFloor(chunk: ChunkData) {
+		for (let lx = 0; lx < CHUNK_SIZE; lx++) {
+			for (let lz = 0; lz < CHUNK_SIZE; lz++) {
+				this.setLocal(chunk, lx, 0, lz, BlockId.Bedrock);
+			}
+		}
 	}
 
 	private decoratePonds(chunk: ChunkData) {

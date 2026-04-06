@@ -340,6 +340,10 @@ body {
 	border-color: rgba(160, 223, 255, 0.4);
 }
 
+.cube.block-bedrock .face {
+	background-image: url("/textures/block/bedrock.png");
+}
+
 .slot.selected {
 	border-color: #7dd3fc;
 	box-shadow:

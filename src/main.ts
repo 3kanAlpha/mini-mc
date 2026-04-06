@@ -10,16 +10,23 @@ import {
 	Euler,
 	Float32BufferAttribute,
 	Fog,
+	Group,
 	HemisphereLight,
 	LineBasicMaterial,
 	LineSegments,
 	Mesh,
+	MeshBasicMaterial,
+	NearestFilter,
 	PerspectiveCamera,
+	PlaneGeometry,
 	Points,
 	PointsMaterial,
 	Scene,
 	ShaderMaterial,
 	SphereGeometry,
+	SRGBColorSpace,
+	type Texture,
+	TextureLoader,
 	Vector3,
 	WebGLRenderer,
 } from "three";
@@ -57,6 +64,7 @@ const WORLD_SEED = resolveWorldSeed();
 const BASE_FOV = 75;
 const DASH_FOV = 85;
 const BREAK_PARTICLES_PER_BLOCK = 24;
+const BREAK_CRACK_TEXTURE_COUNT = 10;
 const OXYGEN_MAX = 20;
 const OXYGEN_DRAIN_PER_SEC = 2;
 const DROWNING_INTERVAL = 1.5;
@@ -71,7 +79,7 @@ const hotbarSlots: BlockId[] = [
 	BlockId.Planks,
 	BlockId.Leaves,
 	BlockId.Water,
-	BlockId.Grass,
+	BlockId.Bedrock,
 ];
 
 const app = document.querySelector<HTMLDivElement>("#app");
@@ -155,12 +163,87 @@ const highlight = new LineSegments(
 highlight.visible = false;
 scene.add(highlight);
 
+const FACE_OFFSETS = [
+	[1, 0, 0],
+	[-1, 0, 0],
+	[0, 1, 0],
+	[0, -1, 0],
+	[0, 0, 1],
+	[0, 0, -1],
+] as const;
+
+function loadCrackTextures(count: number) {
+	const loader = new TextureLoader();
+	const textures: Texture[] = [];
+	for (let i = 0; i < count; i++) {
+		const texture = loader.load(`/textures/block/destroy_stage_${i}.png`);
+		texture.colorSpace = SRGBColorSpace;
+		texture.magFilter = NearestFilter;
+		texture.minFilter = NearestFilter;
+		texture.generateMipmaps = false;
+		textures.push(texture);
+	}
+	return textures;
+}
+
+const crackTextures = loadCrackTextures(BREAK_CRACK_TEXTURE_COUNT);
+const crackOverlayRoot = new Group();
+crackOverlayRoot.visible = false;
+scene.add(crackOverlayRoot);
+
+const crackOverlayMaterials = FACE_OFFSETS.map(
+	() =>
+		new MeshBasicMaterial({
+			transparent: true,
+			opacity: 1,
+			alphaTest: 0.1,
+			depthTest: false,
+			depthWrite: false,
+		}),
+);
+
+const crackOverlayFaces = [
+	new Mesh(new PlaneGeometry(1.02, 1.02), crackOverlayMaterials[0]),
+	new Mesh(new PlaneGeometry(1.02, 1.02), crackOverlayMaterials[1]),
+	new Mesh(new PlaneGeometry(1.02, 1.02), crackOverlayMaterials[2]),
+	new Mesh(new PlaneGeometry(1.02, 1.02), crackOverlayMaterials[3]),
+	new Mesh(new PlaneGeometry(1.02, 1.02), crackOverlayMaterials[4]),
+	new Mesh(new PlaneGeometry(1.02, 1.02), crackOverlayMaterials[5]),
+];
+
+crackOverlayFaces[0].position.set(0.505, 0, 0);
+crackOverlayFaces[0].rotation.y = Math.PI / 2;
+crackOverlayFaces[1].position.set(-0.505, 0, 0);
+crackOverlayFaces[1].rotation.y = -Math.PI / 2;
+crackOverlayFaces[2].position.set(0, 0.505, 0);
+crackOverlayFaces[2].rotation.x = -Math.PI / 2;
+crackOverlayFaces[3].position.set(0, -0.505, 0);
+crackOverlayFaces[3].rotation.x = Math.PI / 2;
+crackOverlayFaces[4].position.set(0, 0, 0.505);
+crackOverlayFaces[5].position.set(0, 0, -0.505);
+crackOverlayFaces[5].rotation.y = Math.PI;
+
+for (const face of crackOverlayFaces) {
+	face.visible = false;
+	face.renderOrder = 10;
+	crackOverlayRoot.add(face);
+}
+
 type BreakParticle = {
 	position: Vector3;
 	velocity: Vector3;
 	life: number;
 	totalLife: number;
 	color: Color;
+};
+
+type BreakingState = {
+	x: number;
+	y: number;
+	z: number;
+	block: BlockId;
+	progress: number;
+	breakSeconds: number;
 };
 
 const breakParticles: BreakParticle[] = [];
@@ -187,6 +270,8 @@ let shakePower = 0;
 let audioContext: AudioContext | undefined;
 let oxygen = OXYGEN_MAX;
 let drowningTimer = 0;
+let leftMouseDown = false;
+let breakingState: BreakingState | undefined;
 
 const keyState = {
 	forward: false,
@@ -241,9 +326,51 @@ function particleColorForBlock(block: BlockId) {
 			return new Color(0x58a7ff);
 		case BlockId.Planks:
 			return new Color(0xb5854f);
+		case BlockId.Bedrock:
+			return new Color(0x4f4f4f);
 		default:
 			return new Color(0xffffff);
 	}
+}
+
+function resetBreakingState() {
+	breakingState = undefined;
+	crackOverlayRoot.visible = false;
+	for (const face of crackOverlayFaces) {
+		face.visible = false;
+	}
+}
+
+function breakSecondsForBlock(block: BlockId) {
+	return Math.max(0.05, BLOCK_DEFS[block].breakSeconds);
+}
+
+function syncCrackOverlay(state: BreakingState) {
+	const stage = Math.min(
+		crackTextures.length - 1,
+		Math.floor(state.progress * crackTextures.length),
+	);
+	for (const mat of crackOverlayMaterials) {
+		if (mat.map !== crackTextures[stage]) {
+			mat.map = crackTextures[stage];
+			mat.needsUpdate = true;
+		}
+	}
+
+	let anyVisible = false;
+	for (let face = 0; face < FACE_OFFSETS.length; face++) {
+		const [ox, oy, oz] = FACE_OFFSETS[face];
+		const neighbor = world.getBlock(state.x + ox, state.y + oy, state.z + oz);
+		const isExposed =
+			neighbor === BlockId.Air ||
+			neighbor === BlockId.Water ||
+			BLOCK_DEFS[neighbor].transparent;
+		crackOverlayFaces[face].visible = isExposed;
+		anyVisible = anyVisible || isExposed;
+	}
+
+	crackOverlayRoot.position.set(state.x + 0.5, state.y + 0.5, state.z + 0.5);
+	crackOverlayRoot.visible = anyVisible;
 }
 
 function spawnBreakParticles(x: number, y: number, z: number, block: BlockId) {
@@ -363,7 +490,7 @@ function blockLabel(block: BlockId) {
 	return BLOCK_DEFS[block].name;
 }
 
-function tryInteract(isPrimary: boolean) {
+function tryPlaceBlock() {
 	if (isDead) {
 		return;
 	}
@@ -371,15 +498,6 @@ function tryInteract(isPrimary: boolean) {
 	const direction = new Vector3(0, 0, -1).applyEuler(player.getCameraEuler());
 	const hit = voxelRaycast(world, origin, direction, INTERACTION_DISTANCE);
 	if (!hit) {
-		return;
-	}
-	const hitBlock = world.getBlock(hit.block.x, hit.block.y, hit.block.z);
-	if (isPrimary) {
-		if (hitBlock !== BlockId.Water && isBlockBreakable(hitBlock)) {
-			spawnBreakParticles(hit.block.x, hit.block.y, hit.block.z, hitBlock);
-			world.setBlock(hit.block.x, hit.block.y, hit.block.z, BlockId.Air);
-			playBeep(174, 0.06, 0.04);
-		}
 		return;
 	}
 
@@ -396,6 +514,70 @@ function tryInteract(isPrimary: boolean) {
 	}
 	world.setBlock(x, y, z, placeBlock);
 	playBeep(415, 0.05, 0.03);
+}
+
+function updateBlockBreaking(dt: number) {
+	if (isDead || !leftMouseDown || document.pointerLockElement !== canvas) {
+		resetBreakingState();
+		return;
+	}
+	const origin = player.getEyePosition();
+	const direction = new Vector3(0, 0, -1).applyEuler(player.getCameraEuler());
+	const hit = voxelRaycast(world, origin, direction, INTERACTION_DISTANCE);
+	if (!hit) {
+		resetBreakingState();
+		return;
+	}
+
+	const block = world.getBlock(hit.block.x, hit.block.y, hit.block.z);
+	if (
+		block === BlockId.Air ||
+		block === BlockId.Water ||
+		!isBlockBreakable(block)
+	) {
+		resetBreakingState();
+		return;
+	}
+
+	if (
+		!breakingState ||
+		breakingState.x !== hit.block.x ||
+		breakingState.y !== hit.block.y ||
+		breakingState.z !== hit.block.z ||
+		breakingState.block !== block
+	) {
+		breakingState = {
+			x: hit.block.x,
+			y: hit.block.y,
+			z: hit.block.z,
+			block,
+			progress: 0,
+			breakSeconds: breakSecondsForBlock(block),
+		};
+	}
+
+	breakingState.progress = Math.min(
+		1,
+		breakingState.progress + dt / breakingState.breakSeconds,
+	);
+	syncCrackOverlay(breakingState);
+
+	if (breakingState.progress >= 1) {
+		spawnBreakParticles(
+			breakingState.x,
+			breakingState.y,
+			breakingState.z,
+			breakingState.block,
+		);
+		world.setBlock(
+			breakingState.x,
+			breakingState.y,
+			breakingState.z,
+			BlockId.Air,
+		);
+		playBeep(174, 0.06, 0.04);
+		resetBreakingState();
+	}
 }
 
 function updateBlockHighlight() {
@@ -517,11 +699,26 @@ document.addEventListener("mousedown", (event) => {
 		return;
 	}
 	if (event.button === 0) {
-		tryInteract(true);
+		leftMouseDown = true;
 	}
 	if (event.button === 2) {
-		tryInteract(false);
+		tryPlaceBlock();
 	}
+});
+
+document.addEventListener("mouseup", (event) => {
+	if (event.button === 0) {
+		leftMouseDown = false;
+		resetBreakingState();
+	}
+});
+
+document.addEventListener("pointerlockchange", () => {
+	if (document.pointerLockElement === canvas) {
+		return;
+	}
+	leftMouseDown = false;
+	resetBreakingState();
 });
 
 document.addEventListener("contextmenu", (event) => {
@@ -585,6 +782,7 @@ function animate() {
 
 	world.tickSand();
 	clouds.update(elapsed);
+	updateBlockBreaking(dt);
 	updateBreakParticles(dt);
 	chunkRenderer.updateAround(
 		player.position.x,
