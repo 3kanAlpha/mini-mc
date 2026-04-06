@@ -61,8 +61,8 @@ export class Hud {
 		this.healthEl.textContent = `Health: ${health}/${maxHealth}`;
 	}
 
-	renderPosition(x: number, y: number, z: number) {
-		this.positionEl.textContent = `XYZ: ${x.toFixed(1)}, ${y.toFixed(1)}, ${z.toFixed(1)}`;
+	renderPosition(x: number, y: number, z: number, seed: number) {
+		this.positionEl.textContent = `XYZ: ${x.toFixed(1)}, ${y.toFixed(1)}, ${z.toFixed(1)}\nseed: ${seed}`;
 	}
 
 	renderOxygen(oxygen: number, maxOxygen: number, visible: boolean) {

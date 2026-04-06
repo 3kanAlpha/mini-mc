@@ -39,7 +39,21 @@ import { isBlockBreakable, VoxelWorld } from "./game/world";
 
 const MAX_HEALTH = 20;
 const HIGHLIGHT_DISTANCE = 5;
-const WORLD_SEED = Date.now();
+
+function resolveWorldSeed() {
+	const params = new URLSearchParams(window.location.search);
+	const rawSeed = params.get("seed");
+	if (rawSeed === null) {
+		return Date.now();
+	}
+	const parsed = Number(rawSeed);
+	if (!Number.isInteger(parsed) || !Number.isFinite(parsed)) {
+		return Date.now();
+	}
+	return parsed;
+}
+
+const WORLD_SEED = resolveWorldSeed();
 const BASE_FOV = 75;
 const DASH_FOV = 85;
 const BREAK_PARTICLES_PER_BLOCK = 24;
@@ -561,7 +575,12 @@ function animate() {
 		camera.fov += (BASE_FOV - camera.fov) * Math.min(1, dt * 8);
 		camera.updateProjectionMatrix();
 	}
-	hud.renderPosition(player.position.x, player.position.y, player.position.z);
+	hud.renderPosition(
+		player.position.x,
+		player.position.y,
+		player.position.z,
+		WORLD_SEED,
+	);
 	hud.renderOxygen(oxygen, OXYGEN_MAX, player.isHeadInWater());
 
 	world.tickSand();
