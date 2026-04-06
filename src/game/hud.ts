@@ -14,6 +14,7 @@ const BLOCK_LABEL: Record<BlockId, string> = {
 
 export class Hud {
 	private readonly healthEl: HTMLDivElement;
+	private readonly oxygenEl: HTMLDivElement;
 	private readonly positionEl: HTMLDivElement;
 	private readonly underwaterOverlayEl: HTMLDivElement;
 	private readonly hotbarEl: HTMLDivElement;
@@ -30,6 +31,7 @@ export class Hud {
 					<div id="crosshair" aria-hidden="true"></div>
 					<div id="position"></div>
 					<div id="health"></div>
+					<div id="oxygen" class="hidden"></div>
 					<div id="hotbar"></div>
 					<div id="hint">クリックで視点固定 / WASD + Space で移動</div>
 					<div id="death-screen" class="hidden">
@@ -44,6 +46,7 @@ export class Hud {
 		)!;
 		this.positionEl = root.querySelector<HTMLDivElement>("#position")!;
 		this.healthEl = root.querySelector<HTMLDivElement>("#health")!;
+		this.oxygenEl = root.querySelector<HTMLDivElement>("#oxygen")!;
 		this.hotbarEl = root.querySelector<HTMLDivElement>("#hotbar")!;
 		this.deathEl = root.querySelector<HTMLDivElement>("#death-screen")!;
 		this.deathMessageEl = root.querySelector<HTMLDivElement>("#death-message")!;
@@ -60,6 +63,11 @@ export class Hud {
 
 	renderPosition(x: number, y: number, z: number) {
 		this.positionEl.textContent = `XYZ: ${x.toFixed(1)}, ${y.toFixed(1)}, ${z.toFixed(1)}`;
+	}
+
+	renderOxygen(oxygen: number, maxOxygen: number, visible: boolean) {
+		this.oxygenEl.textContent = `O2: ${Math.ceil(oxygen)}/${maxOxygen}`;
+		this.oxygenEl.classList.toggle("hidden", !visible);
 	}
 
 	setUnderwaterOverlay(visible: boolean) {

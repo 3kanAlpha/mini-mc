@@ -44,14 +44,73 @@ body {
 #underwater-overlay {
 	position: absolute;
 	inset: 0;
-	background: rgba(22, 72, 140, 0.34);
-	box-shadow: inset 0 0 90px rgba(7, 29, 71, 0.35);
+	background: rgba(22, 72, 140, 0.4);
+	box-shadow: inset 0 0 110px rgba(7, 29, 71, 0.42);
 	opacity: 0;
 	transition: opacity 0.14s ease;
+	overflow: hidden;
+}
+
+#underwater-overlay::before {
+	content: "";
+	position: absolute;
+	inset: -28%;
+	background:
+		radial-gradient(
+			circle at 20% 35%,
+			rgba(205, 236, 255, 0.18),
+			transparent 30%
+		),
+		radial-gradient(
+			circle at 70% 55%,
+			rgba(150, 210, 255, 0.15),
+			transparent 34%
+		),
+		radial-gradient(
+			circle at 42% 82%,
+			rgba(120, 186, 255, 0.15),
+			transparent 32%
+		);
+	opacity: 0;
+	filter: blur(2px);
 }
 
 #underwater-overlay.visible {
 	opacity: 1;
+}
+
+#underwater-overlay.visible::before {
+	opacity: 1;
+	animation: waterWobble 2.8s ease-in-out infinite;
+}
+
+#underwater-overlay.visible::after {
+	opacity: 0.75;
+	animation: waterWobbleAlt 2.2s linear infinite;
+}
+
+@keyframes waterWobble {
+	0% {
+		transform: translate3d(-5%, -4%, 0) scale(1.06);
+	}
+	50% {
+		transform: translate3d(4.5%, 3.8%, 0) scale(1.1);
+	}
+	100% {
+		transform: translate3d(-5%, -4%, 0) scale(1.06);
+	}
+}
+
+@keyframes waterWobbleAlt {
+	0% {
+		transform: translate3d(6%, -4%, 0) rotate(0deg);
+	}
+	50% {
+		transform: translate3d(-6%, 5%, 0) rotate(1.4deg);
+	}
+	100% {
+		transform: translate3d(6%, -4%, 0) rotate(0deg);
+	}
 }
 
 #crosshair {
@@ -112,6 +171,20 @@ body {
 	letter-spacing: 0.5px;
 }
 
+#oxygen {
+	position: absolute;
+	left: calc(50% + 92px);
+	bottom: 120px;
+	padding: 7px 12px;
+	border: 1px solid rgba(170, 215, 255, 0.36);
+	border-radius: 10px;
+	background: rgba(20, 44, 76, 0.62);
+	backdrop-filter: blur(4px);
+	font-weight: 700;
+	letter-spacing: 0.5px;
+	color: #dbeafe;
+}
+
 #hint {
 	position: absolute;
 	top: 18px;
@@ -124,6 +197,7 @@ body {
 	font-size: 13px;
 	color: #dbeafe;
 	text-align: center;
+	display: none;
 }
 
 #hotbar {
@@ -327,12 +401,18 @@ body {
 	}
 
 	#position,
-	#health {
+	#health,
+	#oxygen {
 		font-size: 13px;
 		padding: 6px 10px;
 	}
 
 	#health {
+		bottom: 216px;
+	}
+
+	#oxygen {
+		left: calc(50% + 78px);
 		bottom: 216px;
 	}
 

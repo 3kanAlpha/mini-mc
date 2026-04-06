@@ -12,6 +12,10 @@ const WATER_SPEED_FACTOR = 0.45;
 const JUMP_SPEED = 8.5;
 const DRAG = 10;
 const LOOK_SENSITIVITY = 0.0015;
+const SWIM_UP_SPEED = 2.2;
+const SWIM_DOWN_SPEED = 1.2;
+const SWIM_ACCEL = 10;
+const SWIM_CLIMB_BOOST = 4.8;
 
 export class Player {
 	position = new Vector3();
@@ -20,9 +24,11 @@ export class Player {
 	pitch = 0;
 	onGround = false;
 	inWater = false;
+	headInWater = false;
 	private fallStartY = 0;
 	private wasOnGround = false;
 	private sprinting = false;
+	private swimAscend = false;
 
 	private readonly moveInput = new Vector3();
 	private readonly world: VoxelWorld;
@@ -56,6 +62,14 @@ export class Player {
 		this.sprinting = sprinting;
 	}
 
+	setSwimAscend(swimAscend: boolean) {
+		this.swimAscend = swimAscend;
+	}
+
+	isTouchingWater() {
+		return this.inWater;
+	}
+
 	jump() {
 		if (!this.onGround) {
 			return;
@@ -65,6 +79,8 @@ export class Player {
 	}
 
 	update(dt: number) {
+		this.inWater = this.checkInWater();
+		this.headInWater = this.checkHeadInWater();
 		const moveDir = new Vector3();
 		const forward = new Vector3(-Math.sin(this.yaw), 0, -Math.cos(this.yaw));
 		const right = new Vector3(Math.cos(this.yaw), 0, -Math.sin(this.yaw));
@@ -81,7 +97,21 @@ export class Player {
 		const dragScale = Math.max(0, 1 - DRAG * dt);
 		this.velocity.x *= dragScale;
 		this.velocity.z *= dragScale;
-		this.velocity.y -= GRAVITY * dt * (this.inWater ? 0.3 : 1);
+		if (this.inWater) {
+			const targetY = this.swimAscend ? SWIM_UP_SPEED : -SWIM_DOWN_SPEED;
+			this.velocity.y +=
+				(targetY - this.velocity.y) * Math.min(1, SWIM_ACCEL * dt);
+			if (
+				this.swimAscend &&
+				!this.headInWater &&
+				moveDir.lengthSq() > 0 &&
+				this.canSwimClimbOut(moveDir)
+			) {
+				this.velocity.y = Math.max(this.velocity.y, SWIM_CLIMB_BOOST);
+			}
+		} else {
+			this.velocity.y -= GRAVITY * dt * (this.inWater ? 0.3 : 1);
+		}
 
 		this.moveAxis("x", this.velocity.x * dt);
 		this.moveAxis("y", this.velocity.y * dt);
@@ -100,7 +130,12 @@ export class Player {
 		}
 		this.wasOnGround = this.onGround;
 		this.inWater = this.checkInWater();
+		this.headInWater = this.checkHeadInWater();
 		return landedDistance;
+	}
+
+	isHeadInWater() {
+		return this.headInWater;
 	}
 
 	getEyePosition() {
@@ -224,5 +259,34 @@ export class Player {
 			}
 		}
 		return false;
+	}
+
+	private checkHeadInWater() {
+		const eye = this.getEyePosition();
+		return (
+			this.world.getBlock(
+				Math.floor(eye.x),
+				Math.floor(eye.y),
+				Math.floor(eye.z),
+			) === BlockId.Water
+		);
+	}
+
+	private canSwimClimbOut(moveDir: Vector3) {
+		const half = PLAYER_WIDTH * 0.5;
+		const ahead = this.position.clone().addScaledVector(moveDir, half + 0.36);
+		const fx = Math.floor(ahead.x);
+		const fz = Math.floor(ahead.z);
+		const y0 = Math.floor(this.position.y + 0.1);
+		const y1 = y0 + 1;
+		const y2 = y0 + 2;
+
+		const wallAtFeet = this.world.isSolid(this.world.getBlock(fx, y0, fz));
+		const wallAtBody = this.world.isSolid(this.world.getBlock(fx, y1, fz));
+		const spaceAbove =
+			this.world.getBlock(fx, y1, fz) === BlockId.Air &&
+			this.world.getBlock(fx, y2, fz) === BlockId.Air;
+
+		return (wallAtFeet || wallAtBody) && spaceAbove;
 	}
 }

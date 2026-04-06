@@ -43,6 +43,10 @@ const WORLD_SEED = Date.now();
 const BASE_FOV = 75;
 const DASH_FOV = 85;
 const BREAK_PARTICLES_PER_BLOCK = 24;
+const OXYGEN_MAX = 20;
+const OXYGEN_DRAIN_PER_SEC = 2;
+const DROWNING_INTERVAL = 1.5;
+const DROWNING_DAMAGE = 2;
 
 const hotbarSlots: BlockId[] = [
 	BlockId.Grass,
@@ -167,6 +171,8 @@ let isDead = false;
 let shakeTimer = 0;
 let shakePower = 0;
 let audioContext: AudioContext | undefined;
+let oxygen = OXYGEN_MAX;
+let drowningTimer = 0;
 
 const keyState = {
 	forward: false,
@@ -313,6 +319,8 @@ function handleDeath() {
 	document.exitPointerLock();
 	hud.showDeath(() => {
 		health = MAX_HEALTH;
+		oxygen = OXYGEN_MAX;
+		drowningTimer = 0;
 		isDead = false;
 		player.setSpawn(world.getSpawnPosition());
 		hud.hideDeath();
@@ -330,7 +338,8 @@ function updateMovementInput() {
 	const sprinting = sprintLatched && isMoving;
 	player.setMoveInput(strafe, forward);
 	player.setSprinting(sprinting);
-	if (keyState.jump) {
+	player.setSwimAscend(keyState.jump);
+	if (keyState.jump && !player.isTouchingWater()) {
 		player.jump();
 	}
 	return sprinting;
@@ -534,11 +543,26 @@ function animate() {
 				takeDamage(damage);
 			}
 		}
+
+		if (player.isHeadInWater()) {
+			oxygen = Math.max(0, oxygen - OXYGEN_DRAIN_PER_SEC * dt);
+			if (oxygen <= 0) {
+				drowningTimer += dt;
+				if (drowningTimer >= DROWNING_INTERVAL) {
+					takeDamage(DROWNING_DAMAGE);
+					drowningTimer -= DROWNING_INTERVAL;
+				}
+			}
+		} else {
+			oxygen = OXYGEN_MAX;
+			drowningTimer = 0;
+		}
 	} else {
 		camera.fov += (BASE_FOV - camera.fov) * Math.min(1, dt * 8);
 		camera.updateProjectionMatrix();
 	}
 	hud.renderPosition(player.position.x, player.position.y, player.position.z);
+	hud.renderOxygen(oxygen, OXYGEN_MAX, player.isHeadInWater());
 
 	world.tickSand();
 	clouds.update(elapsed);
@@ -569,13 +593,7 @@ function animate() {
 		eye.z += (Math.random() * 2 - 1) * ampPos;
 	}
 	camera.position.copy(eye);
-	hud.setUnderwaterOverlay(
-		world.getBlock(
-			Math.floor(rawEye.x),
-			Math.floor(rawEye.y),
-			Math.floor(rawEye.z),
-		) === BlockId.Water,
-	);
+	hud.setUnderwaterOverlay(player.isHeadInWater());
 	updateBlockHighlight();
 	renderer.render(scene, camera);
 }
