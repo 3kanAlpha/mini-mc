@@ -18,6 +18,7 @@ export const BlockId = {
 	Log: 5,
 	Leaves: 6,
 	Water: 7,
+	Planks: 8,
 } as const;
 
 export type BlockId = (typeof BlockId)[keyof typeof BlockId];

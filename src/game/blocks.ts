@@ -35,6 +35,7 @@ const textureByKey = {
 	sand: loadBlockTexture("/textures/block/sand.png"),
 	log: loadBlockTexture("/textures/block/log_oak.png"),
 	logTop: loadBlockTexture("/textures/block/log_oak_top.png"),
+	planks: loadBlockTexture("/textures/block/planks_oak.png"),
 	leaves: loadBlockTexture("/textures/block/leaves_oak.png"),
 } as const;
 
@@ -111,6 +112,15 @@ export const BLOCK_DEFS: Record<BlockId, BlockDef> = {
 		liquid: true,
 		slows: true,
 	},
+	[BlockId.Planks]: {
+		id: BlockId.Planks,
+		name: "Planks",
+		solid: true,
+		breakable: true,
+		transparent: false,
+		liquid: false,
+		slows: false,
+	},
 };
 
 const FACE_ORDER: Face[] = [0, 1, 2, 3, 4, 5];
@@ -132,6 +142,8 @@ function textureKeyForFace(block: BlockId, face: Face) {
 			return "log";
 		case BlockId.Leaves:
 			return "leaves";
+		case BlockId.Planks:
+			return "planks";
 		default:
 			return undefined;
 	}
@@ -159,6 +171,7 @@ export class BlockMaterials {
 			BlockId.Stone,
 			BlockId.Sand,
 			BlockId.Log,
+			BlockId.Planks,
 			BlockId.Leaves,
 		]) {
 			for (const face of FACE_ORDER) {

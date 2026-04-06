@@ -2,17 +2,21 @@ import "./style.css";
 import {
 	BackSide,
 	BoxGeometry,
+	BufferGeometry,
 	Clock,
 	Color,
 	DirectionalLight,
 	EdgesGeometry,
 	Euler,
+	Float32BufferAttribute,
 	Fog,
 	HemisphereLight,
 	LineBasicMaterial,
 	LineSegments,
 	Mesh,
 	PerspectiveCamera,
+	Points,
+	PointsMaterial,
 	Scene,
 	ShaderMaterial,
 	SphereGeometry,
@@ -38,6 +42,7 @@ const HIGHLIGHT_DISTANCE = 5;
 const WORLD_SEED = Date.now();
 const BASE_FOV = 75;
 const DASH_FOV = 85;
+const BREAK_PARTICLES_PER_BLOCK = 24;
 
 const hotbarSlots: BlockId[] = [
 	BlockId.Grass,
@@ -45,10 +50,10 @@ const hotbarSlots: BlockId[] = [
 	BlockId.Stone,
 	BlockId.Sand,
 	BlockId.Log,
+	BlockId.Planks,
 	BlockId.Leaves,
+	BlockId.Water,
 	BlockId.Grass,
-	BlockId.Stone,
-	BlockId.Dirt,
 ];
 
 const app = document.querySelector<HTMLDivElement>("#app");
@@ -132,6 +137,30 @@ const highlight = new LineSegments(
 highlight.visible = false;
 scene.add(highlight);
 
+type BreakParticle = {
+	position: Vector3;
+	velocity: Vector3;
+	life: number;
+	totalLife: number;
+	color: Color;
+};
+
+const breakParticles: BreakParticle[] = [];
+const breakParticleGeometry = new BufferGeometry();
+const breakParticleMaterial = new PointsMaterial({
+	size: 0.1,
+	vertexColors: true,
+	transparent: true,
+	opacity: 0.95,
+	sizeAttenuation: true,
+});
+const breakParticlePoints = new Points(
+	breakParticleGeometry,
+	breakParticleMaterial,
+);
+breakParticlePoints.frustumCulled = false;
+scene.add(breakParticlePoints);
+
 let selectedSlot = 0;
 let health = MAX_HEALTH;
 let isDead = false;
@@ -172,6 +201,94 @@ function playBeep(frequency: number, durationSeconds = 0.07, volume = 0.035) {
 	gain.connect(ctx.destination);
 	osc.start(now);
 	osc.stop(now + durationSeconds + 0.02);
+}
+
+function particleColorForBlock(block: BlockId) {
+	switch (block) {
+		case BlockId.Grass:
+			return new Color(0x73b453);
+		case BlockId.Dirt:
+			return new Color(0x8a5b35);
+		case BlockId.Stone:
+			return new Color(0xa0a5ad);
+		case BlockId.Sand:
+			return new Color(0xd9cc8e);
+		case BlockId.Log:
+			return new Color(0x9a6a40);
+		case BlockId.Leaves:
+			return new Color(0x5b9c43);
+		case BlockId.Water:
+			return new Color(0x58a7ff);
+		case BlockId.Planks:
+			return new Color(0xb5854f);
+		default:
+			return new Color(0xffffff);
+	}
+}
+
+function spawnBreakParticles(x: number, y: number, z: number, block: BlockId) {
+	const base = new Vector3(x + 0.5, y + 0.5, z + 0.5);
+	const color = particleColorForBlock(block);
+	for (let i = 0; i < BREAK_PARTICLES_PER_BLOCK; i++) {
+		const dir = new Vector3(
+			Math.random() * 2 - 1,
+			Math.random() * 1.2,
+			Math.random() * 2 - 1,
+		)
+			.normalize()
+			.multiplyScalar(1.2 + Math.random() * 1.4);
+		breakParticles.push({
+			position: base
+				.clone()
+				.add(
+					new Vector3(
+						(Math.random() - 0.5) * 0.25,
+						(Math.random() - 0.5) * 0.25,
+						(Math.random() - 0.5) * 0.25,
+					),
+				),
+			velocity: dir,
+			life: 0.45 + Math.random() * 0.35,
+			totalLife: 0.45 + Math.random() * 0.35,
+			color: color.clone(),
+		});
+	}
+}
+
+function updateBreakParticles(dt: number) {
+	for (let i = breakParticles.length - 1; i >= 0; i--) {
+		const p = breakParticles[i];
+		p.life -= dt;
+		if (p.life <= 0) {
+			breakParticles.splice(i, 1);
+			continue;
+		}
+		p.velocity.y -= 8.8 * dt;
+		p.velocity.multiplyScalar(Math.max(0, 1 - 2.3 * dt));
+		p.position.addScaledVector(p.velocity, dt);
+	}
+
+	const positions = new Float32Array(breakParticles.length * 3);
+	const colors = new Float32Array(breakParticles.length * 3);
+	for (let i = 0; i < breakParticles.length; i++) {
+		const p = breakParticles[i];
+		positions[i * 3] = p.position.x;
+		positions[i * 3 + 1] = p.position.y;
+		positions[i * 3 + 2] = p.position.z;
+		const t = Math.max(0, p.life / p.totalLife);
+		colors[i * 3] = p.color.r * t;
+		colors[i * 3 + 1] = p.color.g * t;
+		colors[i * 3 + 2] = p.color.b * t;
+	}
+	breakParticleGeometry.setAttribute(
+		"position",
+		new Float32BufferAttribute(positions, 3),
+	);
+	breakParticleGeometry.setAttribute(
+		"color",
+		new Float32BufferAttribute(colors, 3),
+	);
+	breakParticleGeometry.computeBoundingSphere();
 }
 
 function updateHud() {
@@ -236,6 +353,7 @@ function tryInteract(isPrimary: boolean) {
 	const hitBlock = world.getBlock(hit.block.x, hit.block.y, hit.block.z);
 	if (isPrimary) {
 		if (hitBlock !== BlockId.Water && isBlockBreakable(hitBlock)) {
+			spawnBreakParticles(hit.block.x, hit.block.y, hit.block.z, hitBlock);
 			world.setBlock(hit.block.x, hit.block.y, hit.block.z, BlockId.Air);
 			playBeep(174, 0.06, 0.04);
 		}
@@ -243,9 +361,6 @@ function tryInteract(isPrimary: boolean) {
 	}
 
 	const placeBlock = hotbarSlots[selectedSlot];
-	if (placeBlock === BlockId.Water) {
-		return;
-	}
 	const { x, y, z } = hit.previous;
 	if (
 		world.getBlock(x, y, z) !== BlockId.Air &&
@@ -427,6 +542,7 @@ function animate() {
 
 	world.tickSand();
 	clouds.update(elapsed);
+	updateBreakParticles(dt);
 	chunkRenderer.updateAround(
 		player.position.x,
 		player.position.z,

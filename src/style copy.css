@@ -160,59 +160,44 @@ body {
 	align-self: end;
 	display: grid;
 	place-items: center;
-	width: 100%;
-	height: 100%;
-	overflow: visible;
 }
 
 .cube {
 	position: relative;
 	width: 30px;
-	height: 26px;
+	height: 24px;
 }
 
 .cube .face {
 	position: absolute;
-	box-sizing: border-box;
-	background-repeat: no-repeat;
+	background-size: cover;
 	background-position: center;
-	background-size: 100% 100%;
 	image-rendering: pixelated;
 	border: 1px solid rgba(0, 0, 0, 0.22);
-	backface-visibility: hidden;
 }
 
 .cube .top {
-	left: 8px;
+	left: 6px;
 	top: 0;
-	width: 14px;
-	height: 14px;
-	transform-origin: center;
-	transform: rotate(45deg) scaleY(0.65);
-	z-index: 3;
-	filter: brightness(1.08);
+	width: 18px;
+	height: 10px;
+	clip-path: polygon(50% 0, 100% 50%, 50% 100%, 0 50%);
 }
 
 .cube .left {
-	left: 5px;
-	top: 7px;
-	width: 10px;
-	height: 12px;
-	transform-origin: top left;
-	transform: skewY(31deg);
-	z-index: 2;
-	filter: brightness(0.88);
+	left: 0;
+	top: 8px;
+	width: 12px;
+	height: 14px;
+	clip-path: polygon(100% 0, 100% 100%, 0 75%, 0 25%);
 }
 
 .cube .right {
-	left: 15px;
-	top: 13px;
-	width: 10px;
-	height: 12px;
-	transform-origin: top left;
-	transform: skewY(-31deg);
-	z-index: 1;
-	filter: brightness(0.72);
+	right: 0;
+	top: 8px;
+	width: 12px;
+	height: 14px;
+	clip-path: polygon(0 0, 100% 25%, 100% 75%, 0 100%);
 }
 
 .cube.block-grass .top {

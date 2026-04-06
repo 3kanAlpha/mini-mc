@@ -9,6 +9,7 @@ const BLOCK_LABEL: Record<BlockId, string> = {
 	[BlockId.Log]: "Log",
 	[BlockId.Leaves]: "Leaves",
 	[BlockId.Water]: "Water",
+	[BlockId.Planks]: "Planks",
 };
 
 export class Hud {
@@ -69,7 +70,8 @@ export class Hud {
 		this.hotbarEl.innerHTML = blocks
 			.map((id, index) => {
 				const selected = index === selectedIndex ? "selected" : "";
-				return `<div class="slot ${selected}"><span class="num">${index + 1}</span><span class="name">${BLOCK_LABEL[id]}</span></div>`;
+				const blockClass = `block-${BLOCK_LABEL[id].toLowerCase()}`;
+				return `<div class="slot ${selected}" title="${BLOCK_LABEL[id]}"><span class="num">${index + 1}</span><div class="preview"><div class="cube ${blockClass}"><span class="face top"></span><span class="face left"></span><span class="face right"></span></div></div></div>`;
 			})
 			.join("");
 	}
